@@ -54,6 +54,9 @@ export const spamAnswers = functions.database
       undefined;
 
     if (answerCorrect) {
+      const teamId = await getPlayersTeam(msgSender.toString(), meetingId);
+      if (!teamId) return;
+
       // store answer in db
       const roundName = await getValFromDb(
         `/config/${meetingId}/current/currentState/plugins/spammessages/roundName`
@@ -63,9 +66,9 @@ export const spamAnswers = functions.database
         senderName: msgSenderName,
         answer: messageContent,
         timestamp,
+        teamId,
       });
 
-      const teamId = await getPlayersTeam(msgSender, meetingId);
       // update score for the team
       var questionWeight: number = (
         await db
@@ -74,10 +77,12 @@ export const spamAnswers = functions.database
           )
           .get()
       ).val();
-      await incrementTeamsScore(meetingId, teamId, questionWeight);
+      await incrementTeamsScore(meetingId, teamId, questionWeight, timestamp);
 
       // send chat to this team to tell them they got the correct answer
       const teamBotId = await getBotForTeam(meetingId, teamId);
+      if (!teamBotId) return;
+
       await broadcastMessage(
         meetingId,
         teamBotId,

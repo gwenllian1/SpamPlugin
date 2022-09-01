@@ -1,3 +1,5 @@
+import { isTeam, isTeams } from "./types";
+
 const admin = require("firebase-admin");
 const db = admin.database();
 
@@ -6,6 +8,7 @@ export const getValFromDb = async (path: string): Promise<unknown> =>
 
 export const setValInDb = async (path: string, val: unknown): Promise<void> =>
   await db.ref(path).set(val);
+
 export const updateValInDb = async (
   path: string,
   val: Record<string, unknown>
@@ -42,9 +45,34 @@ export const scheduleFirebaseUpdate = async (
 export const getPlayersTeam = async (
   msgSenderId: string,
   meetingId: string
-): Promise<string> => {
-  // TODO: Need to acess the team's id via the players id
-  return "Team1";
+): Promise<string | null> => {
+  const teams = await getValFromDb(`data/plugins/teamPlugin/${meetingId}`);
+  if (!isTeams(teams)) {
+    return null;
+  }
+
+  const teamId = Object.entries(teams)
+    .map(([teamId]) => {
+      console.log(teams[teamId]);
+      // find member in this team with the id wer'e looking fo
+      const member = teams[teamId].members.find(
+        (member) => member.userId === msgSenderId
+      );
+      console.log(member);
+      if (member) {
+        return teamId;
+      }
+      return undefined;
+    })
+    // find only the teamId
+    .find((teamId) => teamId !== undefined);
+
+  if (!teamId) {
+    // teamId not found -> error
+    return null;
+  }
+
+  return teamId;
 };
 
 /**
@@ -56,17 +84,34 @@ export const getPlayersTeam = async (
 export const getBotForTeam = async (
   meetingId: string,
   teamId: string
-): Promise<string> => {
-  // TODO: Need to get a bot id from a team id
-  return "ZoomSensor_1";
+): Promise<string | null> => {
+  const team = await getValFromDb(
+    `data/plugins/teamPlugin/${meetingId}/${teamId}`
+  );
+  if (!isTeam(team)) {
+    return null;
+  }
+  return team.sensorId;
 };
 
+/**
+ * Increments a team's score
+ * @param meetingId the id of the meeting
+ * @param teamId the id of the team
+ * @param scoreIncrement the amount to increment the score by
+ * @param timestamp the timestamp
+ */
 export const incrementTeamsScore = async (
   meetingId: string,
   teamId: string,
-  scoreIncrement: number
+  scoreIncrement: number,
+  timestamp: number
 ): Promise<void> => {
-  // TODO: Need to increment the team's score
+  await db.ref(`data/plugins/leaderboard/${meetingId}/scoreEvents`).push({
+    amount: scoreIncrement,
+    teamId,
+    timestamp,
+  });
 };
 
 export const getAllBots = async (meetingId: string): Promise<string[]> => {

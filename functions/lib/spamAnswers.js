@@ -32,6 +32,9 @@ exports.spamAnswers = functions.database
     const answerCorrect = answers.find((val) => val === messageContent.toLowerCase().trim()) !==
         undefined;
     if (answerCorrect) {
+        const teamId = await db_1.getPlayersTeam(msgSender.toString(), meetingId);
+        if (!teamId)
+            return;
         // store answer in db
         const roundName = await db_1.getValFromDb(`/config/${meetingId}/current/currentState/plugins/spammessages/roundName`);
         await db_1.setValInDb(`data/spamAnswers/${meetingId}/${roundName}/answers`, {
@@ -39,11 +42,17 @@ exports.spamAnswers = functions.database
             senderName: msgSenderName,
             answer: messageContent,
             timestamp,
+            teamId,
         });
-        const teamId = await db_1.getPlayersTeam(msgSender, meetingId);
         // update score for the team
+        var questionWeight = (await db
+            .ref(`/config/${meetingId}/current/currentState/plugins/spammessages/questionWeight`)
+            .get()).val();
+        await db_1.incrementTeamsScore(meetingId, teamId, questionWeight, timestamp);
         // send chat to this team to tell them they got the correct answer
         const teamBotId = await db_1.getBotForTeam(meetingId, teamId);
+        if (!teamBotId)
+            return;
         await db_1.broadcastMessage(meetingId, teamBotId, `Well done! ${messageContent} was the correct answer, we are moving on to the next round`);
         // send message to all other teams telling them the correct answer
         const botIds = await db_1.getAllBots(meetingId);

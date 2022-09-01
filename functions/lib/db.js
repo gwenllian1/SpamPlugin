@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.broadcastMessage = exports.getAllBots = exports.getBotForTeam = exports.getPlayersTeam = exports.scheduleFirebaseUpdate = exports.updateValInDb = exports.setValInDb = exports.getValFromDb = void 0;
+exports.broadcastMessage = exports.getAllBots = exports.incrementTeamsScore = exports.getBotForTeam = exports.getPlayersTeam = exports.scheduleFirebaseUpdate = exports.updateValInDb = exports.setValInDb = exports.getValFromDb = void 0;
+const types_1 = require("./types");
 const admin = require("firebase-admin");
 const db = admin.database();
 exports.getValFromDb = async (path) => (await db.ref(path).get()).val();
@@ -29,7 +30,28 @@ exports.scheduleFirebaseUpdate = async (meetingId, timestamp, path, value) => {
  * @returns the team's id
  */
 exports.getPlayersTeam = async (msgSenderId, meetingId) => {
-    return "Team1";
+    const teams = await exports.getValFromDb(`data/plugins/teamPlugin/${meetingId}`);
+    if (!types_1.isTeams(teams)) {
+        return null;
+    }
+    const teamId = Object.entries(teams)
+        .map(([teamId]) => {
+        console.log(teams[teamId]);
+        // find member in this team with the id wer'e looking fo
+        const member = teams[teamId].members.find((member) => member.userId === msgSenderId);
+        console.log(member);
+        if (member) {
+            return teamId;
+        }
+        return undefined;
+    })
+        // find only the teamId
+        .find((teamId) => teamId !== undefined);
+    if (!teamId) {
+        // teamId not found -> error
+        return null;
+    }
+    return teamId;
 };
 /**
  * Returns a zoom bot id associated with a particular team
@@ -38,7 +60,25 @@ exports.getPlayersTeam = async (msgSenderId, meetingId) => {
  * @returns the bot id
  */
 exports.getBotForTeam = async (meetingId, teamId) => {
-    return "ZoomSensor_1";
+    const team = await exports.getValFromDb(`data/plugins/teamPlugin/${meetingId}/${teamId}`);
+    if (!types_1.isTeam(team)) {
+        return null;
+    }
+    return team.sensorId;
+};
+/**
+ * Increments a team's score
+ * @param meetingId the id of the meeting
+ * @param teamId the id of the team
+ * @param scoreIncrement the amount to increment the score by
+ * @param timestamp the timestamp
+ */
+exports.incrementTeamsScore = async (meetingId, teamId, scoreIncrement, timestamp) => {
+    await db.ref(`data/plugins/leaderboard/${meetingId}/scoreEvents`).push({
+        amount: scoreIncrement,
+        teamId,
+        timestamp,
+    });
 };
 exports.getAllBots = async (meetingId) => {
     var _a;
