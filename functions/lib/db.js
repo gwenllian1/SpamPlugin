@@ -1,12 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.broadcastMessage = exports.getAllBots = exports.incrementTeamsScore = exports.getBotForTeam = exports.getPlayersTeam = exports.scheduleFirebaseUpdate = exports.updateValInDb = exports.setValInDb = exports.getValFromDb = void 0;
+exports.correctAnswerSingle = exports.correctAnswerMultiple = exports.updateTeamScore = exports.nextRound = exports.broadcastMessage = exports.getAllBots = exports.incrementTeamsScore = exports.getBotForTeam = exports.getPlayersTeam = exports.scheduleFirebaseUpdate = exports.pushValToDb = exports.updateValInDb = exports.setValInDb = exports.getValFromDb = void 0;
 const types_1 = require("./types");
 const admin = require("firebase-admin");
 const db = admin.database();
 exports.getValFromDb = async (path) => (await db.ref(path).get()).val();
 exports.setValInDb = async (path, val) => await db.ref(path).set(val);
 exports.updateValInDb = async (path, val) => await db.ref(path).update(val);
+exports.pushValToDb = async (path, val) => await db.ref(path).push(val);
 /**
  * Call this function to schedule an update to a firebase path in the future.  Note that all scheduled updates
  * associated with a specific meetingId will be cancelled (removed) when that meeting changes to a new section; if you
@@ -96,5 +97,82 @@ exports.broadcastMessage = async (meetingId, sensorId, content) => {
         msg: content,
         receiver: 0,
     });
+};
+exports.nextRound = async (meetingId, timestamp) => {
+    // move to next round
+    let { currentSection } = (await db.ref(`/config/${meetingId}/current`).get()).val();
+    if (typeof currentSection == "string") {
+        currentSection = parseInt(currentSection);
+    }
+    await exports.scheduleFirebaseUpdate(meetingId, timestamp, `config/${meetingId}/current/currentSection`, parseInt(currentSection) + 1);
+};
+exports.updateTeamScore = async (meetingId, timestamp, teamId) => {
+    // update score for the team
+    var questionWeight = (await db
+        .ref(`/config/${meetingId}/current/currentState/plugins/spammessages/questionWeight`)
+        .get()).val();
+    await exports.incrementTeamsScore(meetingId, teamId, questionWeight, timestamp);
+};
+exports.correctAnswerMultiple = async (meetingId, teamId, roundName, messageContent, timestamp, msgSender, msgSenderName) => {
+    const teamBotId = await exports.getBotForTeam(meetingId, teamId);
+    if (!teamBotId)
+        return;
+    //checking if the answer has been submitted before
+    var previousAnswers = (await db
+        .ref(`data/plugins/spamAnswers/${meetingId}/${roundName}/answers/${teamId}`)
+        .get()).val();
+    console.log("previous answers");
+    console.log(previousAnswers);
+    //the answer is in the db, check if the team submitted it
+    if (previousAnswers) {
+        const answered = Object.values(previousAnswers).find((val) => val === messageContent.toLowerCase().trim()) !== undefined;
+        console.log("answered");
+        console.log(answered);
+        //if the team has not submitted the answer before, update the database otherwise inform them
+        //that the answer is not valid.
+        if (!answered) {
+            await exports.pushValToDb(`data/plugins/spamAnswers/${meetingId}/${roundName}/answers/${teamId}`, {
+                senderId: msgSender,
+                senderName: msgSenderName,
+                answer: messageContent,
+                timestamp,
+                teamId,
+            });
+            await exports.broadcastMessage(meetingId, teamBotId, `Well done! ${messageContent} was a correct answer`);
+            await exports.updateTeamScore(meetingId, roundName, msgSender);
+        }
+        else {
+            await exports.broadcastMessage(meetingId, teamBotId, `${messageContent} has already been submitted, please try a different answer`);
+        }
+    }
+    else {
+        //if there are no previous answers in the database
+        await exports.pushValToDb(`data/plugins/spamAnswers/${meetingId}/${roundName}/answers/${teamId}`, {
+            senderId: msgSender,
+            senderName: msgSenderName,
+            answer: messageContent,
+            timestamp,
+            teamId,
+        });
+        await exports.updateTeamScore(meetingId, roundName, msgSender);
+        await exports.broadcastMessage(meetingId, teamBotId, `Well done! ${messageContent} was a correct answer`);
+    }
+};
+exports.correctAnswerSingle = async (meetingId, teamId, messageContent, timestamp) => {
+    // send chat to this team to tell them they got the correct answer
+    const teamBotId = await exports.getBotForTeam(meetingId, teamId);
+    if (!teamBotId)
+        return;
+    await exports.broadcastMessage(meetingId, teamBotId, `Well done! ${messageContent} was the correct answer, we are moving on to the next round`);
+    // send message to all other teams telling them the correct answer
+    const botIds = await exports.getAllBots(meetingId);
+    botIds.forEach(async (id) => {
+        // if is winning team's bot ignore
+        if (id === teamBotId) {
+            return;
+        }
+        await exports.broadcastMessage(meetingId, id, `Unfortunately, Team ${teamId} guessed the correct answer (${messageContent}), better luck next time!`);
+    });
+    await exports.nextRound(meetingId, timestamp);
 };
 //# sourceMappingURL=db.js.map

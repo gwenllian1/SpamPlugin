@@ -1,182 +1,23 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {
-  broadcastMessage,
-  getAllBots,
   getBotForTeam,
   getPlayersTeam,
   getValFromDb,
-  incrementTeamsScore,
-  scheduleFirebaseUpdate,
+  updateTeamScore,
   setValInDb,
+  correctAnswerMultiple,
+  correctAnswerSingle,
 } from "./db";
 
 //const { snapshot } = require("firebase-functions");
 //const admin = require("firebase-admin");
 const db = admin.database();
-
-const nextRound = async (meetingId: string, timestamp: any) => {
-  // move to next round
-  let { currentSection } = (
-    await db.ref(`/config/${meetingId}/current`).get()
-  ).val();
-  if (typeof currentSection == "string") {
-    currentSection = parseInt(currentSection);
-  }
-
-  await scheduleFirebaseUpdate(
-    meetingId,
-    timestamp,
-    `config/${meetingId}/current/currentSection`,
-    parseInt(currentSection) + 1
-  );
-};
-
-const updateDatabase = async (
-  meetingId: string,
-  roundName: unknown,
-  msgSender: string,
-  msgSenderName: string,
-  messageContent: string,
-  timestamp: any,
-  teamId: string
-) => {
-  // store answer in db
-  await setValInDb(
-    `data/plugins/spamAnswers/${meetingId}/${roundName}/answers/${teamId}`,
-    {
-      senderId: msgSender,
-      senderName: msgSenderName,
-      answer: messageContent,
-      timestamp,
-      teamId,
-    }
-  );
-
-  // update score for the team
-  var questionWeight: number = (
-    await db
-      .ref(
-        `/config/${meetingId}/current/currentState/plugins/spammessages/questionWeight`
-      )
-      .get()
-  ).val();
-  await incrementTeamsScore(meetingId, teamId, questionWeight, timestamp);
-};
-
-const correctAnswerMultiple = async (
-  meetingId: string,
-  teamId: string,
-  roundName: unknown,
-  messageContent: string,
-  timestamp: any,
-  msgSender: string,
-  msgSenderName: string
-) => {
-  const teamBotId = await getBotForTeam(meetingId, teamId);
-  if (!teamBotId) return;
-  //checking if the answer has been submitted before
-  var previousAnswers: string[] = (
-    await db
-      .ref(
-        `data/plugins/spamAnswers/${meetingId}/${roundName}/answers/${teamId}`
-      )
-      .get()
-  ).val();
-  console.log("previous answers");
-  console.log(previousAnswers);
-  //the answer is in the db, check if the team submitted it
-  if (previousAnswers) {
-    const answered =
-      Object.values(previousAnswers).find(
-        (val) => val === messageContent.toLowerCase().trim()
-      ) !== undefined;
-    console.log("answered");
-    console.log(answered);
-    if (!answered) {
-      //if the team has not submitted the answer before, update the database otherwise inform them
-      //that the answer is not valid.
-      await db
-        .ref(
-          `data/plugins/spamAnswers/${meetingId}/${roundName}/answers/${teamId}`
-        )
-        .push({
-          senderId: msgSender,
-          senderName: msgSenderName,
-          answer: messageContent,
-          timestamp,
-          teamId,
-        });
-      await broadcastMessage(
-        meetingId,
-        teamBotId,
-        `Well done! ${messageContent} was a correct answer`
-      );
-    } else {
-      await broadcastMessage(
-        meetingId,
-        teamBotId,
-        `${messageContent} has already been submitted, please try a different answer`
-      );
-    }
-  } else {
-    await db
-      .ref(
-        `data/plugins/spamAnswers/${meetingId}/${roundName}/answers/${teamId}`
-      )
-      .push({
-        senderId: msgSender,
-        senderName: msgSenderName,
-        answer: messageContent,
-        timestamp,
-        teamId,
-      });
-    await broadcastMessage(
-      meetingId,
-      teamBotId,
-      `Well done! ${messageContent} was a correct answer`
-    );
-  }
-};
-
-const correctAnswerSingle = async (
-  meetingId: string,
-  teamId: string,
-  messageContent: string,
-  timestamp: any
-) => {
-  // send chat to this team to tell them they got the correct answer
-  const teamBotId = await getBotForTeam(meetingId, teamId);
-  if (!teamBotId) return;
-
-  await broadcastMessage(
-    meetingId,
-    teamBotId,
-    `Well done! ${messageContent} was the correct answer, we are moving on to the next round`
-  );
-
-  // send message to all other teams telling them the correct answer
-  const botIds = await getAllBots(meetingId);
-  botIds.forEach(async (id) => {
-    // if is winning team's bot ignore
-    if (id === teamBotId) {
-      return;
-    }
-    await broadcastMessage(
-      meetingId,
-      id,
-      `Unfortunately, Team ${teamId} guessed the correct answer (${messageContent}), better luck next time!`
-    );
-  });
-
-  await nextRound(meetingId, timestamp);
-};
-
 export const spamAnswers = functions.database
   .ref("/data/chats/{meetingId}/{sensor}/{chatId}")
   .onCreate(async (value, context) => {
     const { meetingId, chatId } = context.params;
-
+    console.log("entered function");
     //Check if plugin is enabled
     const config = (
       await db
@@ -184,7 +25,7 @@ export const spamAnswers = functions.database
         .get()
     ).val();
     if (!config || !config.enabled) return;
-
+    console.log("line28");
     // ensure not a control message
     if (chatId === "message") return;
 
@@ -198,7 +39,7 @@ export const spamAnswers = functions.database
 
     //if anything is missing from the message exit the function
     if (!messageContent || !msgSender || !msgSenderName || !timestamp) return;
-
+    console.log("nothing missing");
     // check if answer is correct
     var answers: string[] = (
       await db
@@ -207,36 +48,44 @@ export const spamAnswers = functions.database
         )
         .get()
     ).val();
+    console.log(answers);
     const answerCorrect =
       answers.find((val) => val === messageContent.toLowerCase().trim()) !==
       undefined;
-
+    console.log(answerCorrect);
+    //if the answer is correct, get the team id and team bot id and call either correct answer single or correct
+    //answer multiple.
     if (answerCorrect) {
       const teamId = await getPlayersTeam(msgSender.toString(), meetingId);
       if (!teamId) return;
+      console.log(teamId);
       const roundName = await getValFromDb(
         `/config/${meetingId}/current/currentState/plugins/spammessages/roundName`
       );
+      console.log(roundName);
       const teamBotId = await getBotForTeam(meetingId, teamId);
+      console.log(teamBotId);
       if (!teamBotId) return;
       const roundType = await getValFromDb(
         `/config/${meetingId}/current/currentState/plugins/spammessages/roundType`
       );
-
       console.log(roundType);
       if (
         typeof roundType === "string" &&
         roundType.toLowerCase().trim() === "single_answer"
       ) {
-        await updateDatabase(
-          meetingId,
-          roundName,
-          msgSender,
-          msgSenderName,
-          messageContent,
-          timestamp,
-          teamId
+        // store answer in db
+        await setValInDb(
+          `data/plugins/spamAnswers/${meetingId}/${roundName}/answers/${teamId}`,
+          {
+            senderId: msgSender,
+            senderName: msgSenderName,
+            answer: messageContent,
+            timestamp,
+            teamId,
+          }
         );
+        await updateTeamScore(meetingId, roundName, msgSender);
         await correctAnswerSingle(meetingId, teamId, messageContent, timestamp);
       } else if (
         typeof roundType === "string" &&
@@ -252,5 +101,7 @@ export const spamAnswers = functions.database
           msgSenderName
         );
       }
+
+      //TO DO: SOME KIND OF ERROR HANDLING FOR IF THE ROUND TYPE IS WRONG
     }
   });
