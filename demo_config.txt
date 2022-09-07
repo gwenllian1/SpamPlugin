@@ -3,30 +3,25 @@ tags:
   - Default
 schedule:
   script:
-    - name: Question_1
+    - name: Single_Answer_Example
       advance:
-        type: manual
+        advance:
+        type: manual        
       plugins:
         - plugin: spammessages
           settings:
             roundName: "question_1"
-            solutions: ["correct_answer_q1"]
+            roundType: "single_answer"
+            solutions: ["correct_answer_q1", "correct", "q1"]
             questionWeight: 1
-    - name: Question_2
+    - name: Multi_Answer_Example
       advance:
         type: manual
       plugins:
         - plugin: spammessages
           settings:
             roundName: "question_2"
-            solutions: ["correct_answer_q2"]
+            roundType: "multiple_answer"
+            solutions: ["correct_answer_q2", "correct2", "q2"]
             questionWeight: 1
-    - name: Question_3
-      advance:
-        type: manual
-      plugins:
-        - plugin: spammessages
-          settings:
-            roundName: "question_3"
-            solutions: ["correct_answer_q3"]
-            questionWeight: 1
+ 
