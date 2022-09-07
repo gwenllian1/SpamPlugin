@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listTypeGuard = exports.isTeams = exports.isTeam = void 0;
+exports.listTypeGuard = exports.isTeams = exports.isAnswers = exports.isAnswer = exports.isTeam = void 0;
 const isUser = (value) => {
     if (!value || typeof value !== "object")
         return false;
@@ -17,6 +17,22 @@ exports.isTeam = (value) => {
         typeof record.sensorId === "string" &&
         typeof record.teamName === "string" &&
         exports.listTypeGuard(record.members, isUser));
+};
+exports.isAnswer = (value) => {
+    if (!value || typeof value !== "object")
+        return false;
+    const record = value;
+    return (typeof record.answer === "string" &&
+        typeof record.senderId === "number" &&
+        typeof record.senderName === "string" &&
+        typeof record.teamId === "string" &&
+        typeof record.timestamp === "number");
+};
+exports.isAnswers = (value) => {
+    if (!value || typeof value !== "object")
+        return false;
+    const record = value;
+    return exports.listTypeGuard(Object.values(record), exports.isAnswer);
 };
 exports.isTeams = (value) => {
     if (!value || typeof value !== "object")
