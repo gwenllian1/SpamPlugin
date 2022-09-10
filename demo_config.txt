@@ -5,12 +5,14 @@ schedule:
   script:
     - name: Question_1
       advance:
-        type: manual
+        advance:
+        type: manual        
       plugins:
         - plugin: spammessages
           settings:
             roundName: "question_1"
-            solutions: ["correct_answer_q1"]
+            roundType: "multiple answer"
+            solutions: ["correct_answer_q1", "correct", "q1"]
             questionWeight: 1
     - name: Question_2
       advance:
@@ -19,6 +21,7 @@ schedule:
         - plugin: spammessages
           settings:
             roundName: "question_2"
+            roundType: "single Answer"
             solutions: ["correct_answer_q2"]
             questionWeight: 1
     - name: Question_3

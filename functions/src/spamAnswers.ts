@@ -8,6 +8,8 @@ import {
   setValInDb,
   correctAnswerMultiple,
   correctAnswerSingle,
+  correctAnswerTrivia,
+  checkAnswerSimilarity,
 } from "./db";
 
 //const { snapshot } = require("firebase-functions");
@@ -53,19 +55,20 @@ export const spamAnswers = functions.database
       answers.find((val) => val === messageContent.toLowerCase().trim()) !==
       undefined;
     console.log(answerCorrect);
+    const teamId = await getPlayersTeam(msgSender.toString(), meetingId);
+    if (!teamId) return;
+    console.log(teamId);
+
+    const teamBotId = await getBotForTeam(meetingId, teamId);
+    console.log(teamBotId);
+    if (!teamBotId) return;
     //if the answer is correct, get the team id and team bot id and call either correct answer single or correct
     //answer multiple.
     if (answerCorrect) {
-      const teamId = await getPlayersTeam(msgSender.toString(), meetingId);
-      if (!teamId) return;
-      console.log(teamId);
       const roundName = await getValFromDb(
         `/config/${meetingId}/current/currentState/plugins/spammessages/roundName`
       );
-      console.log(roundName);
-      const teamBotId = await getBotForTeam(meetingId, teamId);
-      console.log(teamBotId);
-      if (!teamBotId) return;
+
       const roundType = await getValFromDb(
         `/config/${meetingId}/current/currentState/plugins/spammessages/roundType`
       );
@@ -100,8 +103,21 @@ export const spamAnswers = functions.database
           msgSender,
           msgSenderName
         );
+      } else if (
+        typeof roundType === "string" &&
+        roundType.toLowerCase().trim() === "trivia_round"
+      ) {
+        await correctAnswerTrivia(meetingId, teamId, messageContent);
+        await updateTeamScore(meetingId, roundName, msgSender);
       }
 
       //TO DO: SOME KIND OF ERROR HANDLING FOR IF THE ROUND TYPE IS WRONG
+    } else {
+      await checkAnswerSimilarity(
+        answers,
+        messageContent.toLowerCase().trim(),
+        meetingId,
+        teamBotId
+      );
     }
   });

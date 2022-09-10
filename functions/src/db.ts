@@ -177,6 +177,35 @@ export const updateTeamScore = async (
   await incrementTeamsScore(meetingId, teamId, questionWeight, timestamp);
 };
 
+export const checkAnswerSimilarity = async (
+  correctAnswers: string[],
+  submittedAnswer: string,
+  meetingId: string,
+  teamBotId: string
+) => {
+  correctAnswers.forEach(async function (answer) {
+    let diff = 0;
+    const longest =
+      answer.length >= submittedAnswer.length ? answer : submittedAnswer;
+    const shortest =
+      answer.length >= submittedAnswer.length ? submittedAnswer : answer;
+
+    for (let i = 0; i <= longest.length; i++) {
+      if (longest.charAt(i) != shortest.charAt(i)) {
+        diff += 1;
+      }
+    }
+
+    if (diff < 2) {
+      await broadcastMessage(
+        meetingId,
+        teamBotId,
+        `This answer was very close!`
+      );
+      return;
+    }
+  });
+};
 export const correctAnswerMultiple = async (
   meetingId: string,
   teamId: string,
@@ -284,4 +313,20 @@ export const correctAnswerSingle = async (
   });
 
   await nextRound(meetingId, timestamp);
+};
+
+export const correctAnswerTrivia = async (
+  meetingId: string,
+  teamId: string,
+  messageContent: string
+) => {
+  // send chat to this team to tell them they got the correct answer
+  const teamBotId = await getBotForTeam(meetingId, teamId);
+  if (!teamBotId) return;
+
+  await broadcastMessage(
+    meetingId,
+    teamBotId,
+    `Well done! ${messageContent} was the correct answer.`
+  );
 };
