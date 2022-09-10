@@ -170,7 +170,7 @@ export const updateTeamScore = async (
   var questionWeight: number = (
     await db
       .ref(
-        `/config/${meetingId}/current/currentState/plugins/spammessages/questionWeight`
+        `/config/${meetingId}/current/currentState/plugins/triviaAnswers/questionWeight`
       )
       .get()
   ).val();
@@ -221,7 +221,7 @@ export const correctAnswerMultiple = async (
   var previousAnswers: string[] = (
     await db
       .ref(
-        `data/plugins/spamAnswers/${meetingId}/${roundName}/answers/${teamId}`
+        `data/plugins/triviaAnswers/${meetingId}/${roundName}/answers/${teamId}`
       )
       .get()
   ).val();
@@ -239,7 +239,7 @@ export const correctAnswerMultiple = async (
     //that the answer is not valid.
     if (!answered) {
       await pushValToDb(
-        `data/plugins/spamAnswers/${meetingId}/${roundName}/answers/${teamId}`,
+        `data/plugins/triviaAnswers/${meetingId}/${roundName}/answers/${teamId}`,
         {
           senderId: msgSender,
           senderName: msgSenderName,
@@ -264,7 +264,7 @@ export const correctAnswerMultiple = async (
   } else {
     //if there are no previous answers in the database
     await pushValToDb(
-      `data/plugins/spamAnswers/${meetingId}/${roundName}/answers/${teamId}`,
+      `data/plugins/triviaAnswers/${meetingId}/${roundName}/answers/${teamId}`,
       {
         senderId: msgSender,
         senderName: msgSenderName,

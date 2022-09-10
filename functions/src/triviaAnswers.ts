@@ -15,7 +15,7 @@ import {
 //const { snapshot } = require("firebase-functions");
 //const admin = require("firebase-admin");
 const db = admin.database();
-export const spamAnswers = functions.database
+export const triviaAnswers = functions.database
   .ref("/data/chats/{meetingId}/{sensor}/{chatId}")
   .onCreate(async (value, context) => {
     const { meetingId, chatId } = context.params;
@@ -23,7 +23,7 @@ export const spamAnswers = functions.database
     //Check if plugin is enabled
     const config = (
       await db
-        .ref(`/config/${meetingId}/current/currentState/plugins/spammessages`)
+        .ref(`/config/${meetingId}/current/currentState/plugins/triviaAnswers`)
         .get()
     ).val();
     if (!config || !config.enabled) return;
@@ -46,7 +46,7 @@ export const spamAnswers = functions.database
     var answers: string[] = (
       await db
         .ref(
-          `/config/${meetingId}/current/currentState/plugins/spammessages/solutions`
+          `/config/${meetingId}/current/currentState/plugins/triviaAnswers/solutions`
         )
         .get()
     ).val();
@@ -66,11 +66,11 @@ export const spamAnswers = functions.database
     //answer multiple.
     if (answerCorrect) {
       const roundName = await getValFromDb(
-        `/config/${meetingId}/current/currentState/plugins/spammessages/roundName`
+        `/config/${meetingId}/current/currentState/plugins/triviaAnswers/roundName`
       );
 
       const roundType = await getValFromDb(
-        `/config/${meetingId}/current/currentState/plugins/spammessages/roundType`
+        `/config/${meetingId}/current/currentState/plugins/triviaAnswers/roundType`
       );
       console.log(roundType);
       if (
@@ -79,7 +79,7 @@ export const spamAnswers = functions.database
       ) {
         // store answer in db
         await setValInDb(
-          `data/plugins/spamAnswers/${meetingId}/${roundName}/answers/${teamId}`,
+          `data/plugins/triviaAnswers/${meetingId}/${roundName}/answers/${teamId}`,
           {
             senderId: msgSender,
             senderName: msgSenderName,
