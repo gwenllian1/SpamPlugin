@@ -170,7 +170,7 @@ export const updateTeamScore = async (
   var questionWeight: number = (
     await db
       .ref(
-        `/config/${meetingId}/current/currentState/plugins/triviaAnswers/questionWeight`
+        `/config/${meetingId}/current/currentState/plugins/triviaanswers/questionWeight`
       )
       .get()
   ).val();
@@ -235,6 +235,7 @@ export const correctAnswerMultiple = async (
       ) !== undefined;
     console.log("answered");
     console.log(answered);
+    console.log(messageContent.toLowerCase().trim());
     //if the team has not submitted the answer before, update the database otherwise inform them
     //that the answer is not valid.
     if (!answered) {

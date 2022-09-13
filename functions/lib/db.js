@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.correctAnswerSingle = exports.correctAnswerMultiple = exports.updateTeamScore = exports.nextRound = exports.broadcastMessage = exports.getAllBots = exports.incrementTeamsScore = exports.getBotForTeam = exports.getPlayersTeam = exports.scheduleFirebaseUpdate = exports.pushValToDb = exports.updateValInDb = exports.setValInDb = exports.getValFromDb = void 0;
+exports.correctAnswerTrivia = exports.correctAnswerSingle = exports.correctAnswerMultiple = exports.checkAnswerSimilarity = exports.updateTeamScore = exports.nextRound = exports.broadcastMessage = exports.getAllBots = exports.incrementTeamsScore = exports.getBotForTeam = exports.getPlayersTeam = exports.scheduleFirebaseUpdate = exports.pushValToDb = exports.updateValInDb = exports.setValInDb = exports.getValFromDb = void 0;
 const types_1 = require("./types");
 const admin = require("firebase-admin");
 const db = admin.database();
@@ -109,9 +109,25 @@ exports.nextRound = async (meetingId, timestamp) => {
 exports.updateTeamScore = async (meetingId, timestamp, teamId) => {
     // update score for the team
     var questionWeight = (await db
-        .ref(`/config/${meetingId}/current/currentState/plugins/spammessages/questionWeight`)
+        .ref(`/config/${meetingId}/current/currentState/plugins/triviaanswers/questionWeight`)
         .get()).val();
     await exports.incrementTeamsScore(meetingId, teamId, questionWeight, timestamp);
+};
+exports.checkAnswerSimilarity = async (correctAnswers, submittedAnswer, meetingId, teamBotId) => {
+    correctAnswers.forEach(async function (answer) {
+        let diff = 0;
+        const longest = answer.length >= submittedAnswer.length ? answer : submittedAnswer;
+        const shortest = answer.length >= submittedAnswer.length ? submittedAnswer : answer;
+        for (let i = 0; i <= longest.length; i++) {
+            if (longest.charAt(i) != shortest.charAt(i)) {
+                diff += 1;
+            }
+        }
+        if (diff < 2) {
+            await exports.broadcastMessage(meetingId, teamBotId, `This answer was very close!`);
+            return;
+        }
+    });
 };
 exports.correctAnswerMultiple = async (meetingId, teamId, roundName, messageContent, timestamp, msgSender, msgSenderName) => {
     const teamBotId = await exports.getBotForTeam(meetingId, teamId);
@@ -119,7 +135,7 @@ exports.correctAnswerMultiple = async (meetingId, teamId, roundName, messageCont
         return;
     //checking if the answer has been submitted before
     var previousAnswers = (await db
-        .ref(`data/plugins/spamAnswers/${meetingId}/${roundName}/answers/${teamId}`)
+        .ref(`data/plugins/triviaAnswers/${meetingId}/${roundName}/answers/${teamId}`)
         .get()).val();
     console.log("previous answers");
     console.log(previousAnswers);
@@ -131,7 +147,7 @@ exports.correctAnswerMultiple = async (meetingId, teamId, roundName, messageCont
         //if the team has not submitted the answer before, update the database otherwise inform them
         //that the answer is not valid.
         if (!answered) {
-            await exports.pushValToDb(`data/plugins/spamAnswers/${meetingId}/${roundName}/answers/${teamId}`, {
+            await exports.pushValToDb(`data/plugins/triviaAnswers/${meetingId}/${roundName}/answers/${teamId}`, {
                 senderId: msgSender,
                 senderName: msgSenderName,
                 answer: messageContent,
@@ -147,7 +163,7 @@ exports.correctAnswerMultiple = async (meetingId, teamId, roundName, messageCont
     }
     else {
         //if there are no previous answers in the database
-        await exports.pushValToDb(`data/plugins/spamAnswers/${meetingId}/${roundName}/answers/${teamId}`, {
+        await exports.pushValToDb(`data/plugins/triviaAnswers/${meetingId}/${roundName}/answers/${teamId}`, {
             senderId: msgSender,
             senderName: msgSenderName,
             answer: messageContent,
@@ -174,5 +190,12 @@ exports.correctAnswerSingle = async (meetingId, teamId, messageContent, timestam
         await exports.broadcastMessage(meetingId, id, `Unfortunately, Team ${teamId} guessed the correct answer (${messageContent}), better luck next time!`);
     });
     await exports.nextRound(meetingId, timestamp);
+};
+exports.correctAnswerTrivia = async (meetingId, teamId, messageContent) => {
+    // send chat to this team to tell them they got the correct answer
+    const teamBotId = await exports.getBotForTeam(meetingId, teamId);
+    if (!teamBotId)
+        return;
+    await exports.broadcastMessage(meetingId, teamBotId, `Well done! ${messageContent} was the correct answer.`);
 };
 //# sourceMappingURL=db.js.map

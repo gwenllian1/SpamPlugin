@@ -23,7 +23,7 @@ export const triviaAnswers = functions.database
     //Check if plugin is enabled
     const config = (
       await db
-        .ref(`/config/${meetingId}/current/currentState/plugins/triviaAnswers`)
+        .ref(`/config/${meetingId}/current/currentState/plugins/triviaanswers`)
         .get()
     ).val();
     if (!config || !config.enabled) return;
@@ -46,7 +46,7 @@ export const triviaAnswers = functions.database
     var answers: string[] = (
       await db
         .ref(
-          `/config/${meetingId}/current/currentState/plugins/triviaAnswers/solutions`
+          `/config/${meetingId}/current/currentState/plugins/triviaanswers/solutions`
         )
         .get()
     ).val();
@@ -66,11 +66,11 @@ export const triviaAnswers = functions.database
     //answer multiple.
     if (answerCorrect) {
       const roundName = await getValFromDb(
-        `/config/${meetingId}/current/currentState/plugins/triviaAnswers/roundName`
+        `/config/${meetingId}/current/currentState/plugins/triviaanswers/roundName`
       );
 
       const roundType = await getValFromDb(
-        `/config/${meetingId}/current/currentState/plugins/triviaAnswers/roundType`
+        `/config/${meetingId}/current/currentState/plugins/triviaanswers/roundType`
       );
       console.log(roundType);
       if (

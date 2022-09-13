@@ -1,6 +1,6 @@
 const admin = require("firebase-admin");
 admin.initializeApp();
 
-const { spamAnswers } = require("./lib/spamAnswers");
+const { triviaAnswers } = require("./lib/triviaAnswers");
 
-exports.spamAnswers = spamAnswers;
+exports.triviaAnswers = triviaAnswers;
